@@ -38,6 +38,19 @@ Boston, MA 02111-1307, USA.  */
 #include "mips/a.out.h"
 #endif /* CROSS_COMPILE */
 
+#define F_RELFLG 0000001
+#define F_EXEC   0000002
+#define F_LNNO   0000004
+#define F_LSYMS  0000010
+#define F_MINMAL 0000020
+#define F_UPDATE 0000040
+#define F_SWABD  0000100
+#define F_AR16WR 0000200
+#define F_AR32WR 0000400
+#define F_AR32W  0001000
+#define F_PATCH  0002000
+#define F_NODF   0002000
+
 #ifndef MIPS_IS_STAB
 /* Macros for mips-tfile.c to encapsulate stabs in ECOFF, and for
    and mips-tdump.c to print them out.  This is used on the Alpha,
