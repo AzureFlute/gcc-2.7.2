@@ -7,9 +7,9 @@
 
 ;; This file is part of GNU CC.
 
-;; GNU CC is free software; you can redistribute it and/or modify
+;; GNU CC is free software, you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation; either version 2, or (at your option)
+;; the Free Software Foundation, either version 2, or (at your option)
 ;; any later version.
 
 ;; GNU CC is distributed in the hope that it will be useful,
@@ -843,37 +843,49 @@
    (set_attr "mode"	"DF")
    (set_attr "length"	"2")])	;; mul.d + nop
 
-(define_insn "mulsf3"
+(define_expand "mulsf3"
   [(set (match_operand:SF 0 "register_operand" "=f")
 	(mult:SF (match_operand:SF 1 "register_operand" "f")
 		 (match_operand:SF 2 "register_operand" "f")))]
   "TARGET_HARD_FLOAT"
+  "
+{
+  if (mips_cpu != PROCESSOR_R4300)
+    emit_insn( gen_mulsf3_internal (operands[0], operands[1], operands[2]));
+  else
+    emit_insn( gen_mulsf3_r4300 (operands[0], operands[1], operands[2]));
+  DONE;
+}")
+
+(define_insn "mulsf3_internal"
+  [(set (match_operand:SF 0 "register_operand" "=f")
+	(mult:SF (match_operand:SF 1 "register_operand" "f")
+		 (match_operand:SF 2 "register_operand" "f")))]
+  "TARGET_HARD_FLOAT && mips_cpu != PROCESSOR_R4300"
   "mul.s\\t%0,%1,%2"
   [(set_attr "type"	"fmul")
    (set_attr "mode"	"SF")
    (set_attr "length"	"1")])
 
+(define_insn "mulsf3_r4300"
+  [(set (match_operand:SF 0 "register_operand" "=f")
+	(mult:SF (match_operand:SF 1 "register_operand" "f")
+		 (match_operand:SF 2 "register_operand" "f")))]
+  "TARGET_HARD_FLOAT && mips_cpu == PROCESSOR_R4300"
+  "*
+{
+  output_asm_insn (\"mul.s\\t%0,%1,%2\", operands);
+  if (TARGET_4300_MUL_FIX)
+    output_asm_insn (\"nop\", operands);
+  return \"\";
+}"
+  [(set_attr "type"	"fmul")
+   (set_attr "mode"	"SF")
+   (set_attr "length"	"2")])	;; mul.s + nop
+
 ;; ??? The R4000 (only) has a cpu bug.  If a double-word shift executes while
 ;; a multiply is in progress, it may give an incorrect result.  Avoid
 ;; this by keeping the mflo with the mult on the R4000.
-
-(define_expand "mulsi3"
-  [(set (match_operand:SI 0 "register_operand" "=l")
-	(mult:SI (match_operand:SI 1 "register_operand" "d")
-		 (match_operand:SI 2 "register_operand" "d")))
-   (clobber (match_scratch:SI 3 "=h"))
-   (clobber (match_scratch:SI 4 "=a"))]
-  ""
-  "
-{
-  if (TARGET_MAD)
-    emit_insn (gen_mulsi3_r4650 (operands[0], operands[1], operands[2]));
-  else if (mips_cpu != PROCESSOR_R4000)
-    emit_insn (gen_mulsi3_internal (operands[0], operands[1], operands[2]));
-  else
-    emit_insn (gen_mulsi3_r4000 (operands[0], operands[1], operands[2]));
-  DONE;
-}")
 
 (define_insn "mulsi3_internal"
   [(set (match_operand:SI 0 "register_operand" "=l")
@@ -938,6 +950,11 @@
     emit_insn (gen_muldi3_r4000 (operands[0], operands[1], operands[2]));
   DONE;
 }")
+
+;; Don't accept both operands using se_register_operand, because if
+;; both operands are sign extended we would prefer to use mult in the
+;; mulsidi3 pattern.  Commutativity should permit either operand to be
+;; sign extended.
 
 (define_insn "muldi3_internal"
   [(set (match_operand:DI 0 "register_operand" "=l")
