@@ -803,15 +803,45 @@
 ;;  ....................
 ;;
 
-(define_insn "muldf3"
+(define_expand "muldf3"
   [(set (match_operand:DF 0 "register_operand" "=f")
 	(mult:DF (match_operand:DF 1 "register_operand" "f")
 		 (match_operand:DF 2 "register_operand" "f")))]
   "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
+  "
+{
+  if (mips_cpu != PROCESSOR_R4300)
+    emit_insn (gen_muldf3_internal (operands[0], operands[1], operands[2]));
+  else
+    emit_insn (gen_muldf3_r4300 (operands[0], operands[1], operands[2]));
+  DONE;
+}")
+
+(define_insn "muldf3_internal"
+  [(set (match_operand:DF 0 "register_operand" "=f")
+	(mult:DF (match_operand:DF 1 "register_operand" "f")
+		 (match_operand:DF 2 "register_operand" "f")))]
+  "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT && mips_cpu != PROCESSOR_R4300"
   "mul.d\\t%0,%1,%2"
   [(set_attr "type"	"fmul")
    (set_attr "mode"	"DF")
    (set_attr "length"	"1")])
+
+(define_insn "muldf3_r4300"
+  [(set (match_operand:DF 0 "register_operand" "=f")
+	(mult:DF (match_operand:DF 1 "register_operand" "f")
+		 (match_operand:DF 2 "register_operand" "f")))]
+  "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT && mips_cpu == PROCESSOR_R4300"
+  "*
+{
+  output_asm_insn (\"mul.d\\t%0,%1,%2\", operands);
+  if (TARGET_4300_MUL_FIX)
+    output_asm_insn (\"nop\", operands);
+  return \"\";
+}"
+  [(set_attr "type"	"fmul")
+   (set_attr "mode"	"DF")
+   (set_attr "length"	"2")])	;; mul.d + nop
 
 (define_insn "mulsf3"
   [(set (match_operand:SF 0 "register_operand" "=f")
@@ -895,7 +925,7 @@
 
 (define_expand "muldi3"
   [(set (match_operand:DI 0 "register_operand" "=l")
-	(mult:DI (match_operand:DI 1 "register_operand" "d")
+	(mult:DI (match_operand:DI 1 "se_register_operand" "d")
 		 (match_operand:DI 2 "register_operand" "d")))
    (clobber (match_scratch:DI 3 "=h"))
    (clobber (match_scratch:DI 4 "=a"))]
@@ -911,7 +941,7 @@
 
 (define_insn "muldi3_internal"
   [(set (match_operand:DI 0 "register_operand" "=l")
-	(mult:DI (match_operand:DI 1 "register_operand" "d")
+	(mult:DI (match_operand:DI 1 "se_register_operand" "d")
 		 (match_operand:DI 2 "register_operand" "d")))
    (clobber (match_scratch:DI 3 "=h"))
    (clobber (match_scratch:DI 4 "=a"))]
@@ -923,7 +953,7 @@
 
 (define_insn "muldi3_r4000"
   [(set (match_operand:DI 0 "register_operand" "=d")
-	(mult:DI (match_operand:DI 1 "register_operand" "d")
+	(mult:DI (match_operand:DI 1 "se_register_operand" "d")
 		 (match_operand:DI 2 "register_operand" "d")))
    (clobber (match_scratch:DI 3 "=h"))
    (clobber (match_scratch:DI 4 "=l"))
@@ -1051,8 +1081,8 @@
 (define_insn "smuldi3_highpart"
   [(set (match_operand:DI 0 "register_operand" "=h")
 	(truncate:DI
-	 (lshiftrt:TI (mult:TI (sign_extend:TI (match_operand:DI 1 "register_operand" "d"))
-			       (sign_extend:TI (match_operand:DI 2 "register_operand" "d")))
+	 (lshiftrt:TI (mult:TI (sign_extend:TI (match_operand:DI 1 "se_register_operand" "d"))
+			       (sign_extend:TI (match_operand:DI 2 "se_register_operand" "d")))
 		      (const_int 64))))
    (clobber (match_scratch:DI 3 "=l"))
    (clobber (match_scratch:DI 4 "=a"))]
@@ -1065,8 +1095,8 @@
 (define_insn "umuldi3_highpart"
   [(set (match_operand:DI 0 "register_operand" "=h")
 	(truncate:DI
-	 (lshiftrt:TI (mult:TI (zero_extend:TI (match_operand:DI 1 "register_operand" "d"))
-			       (zero_extend:TI (match_operand:DI 2 "register_operand" "d")))
+	 (lshiftrt:TI (mult:TI (zero_extend:TI (match_operand:DI 1 "se_register_operand" "d"))
+			       (zero_extend:TI (match_operand:DI 2 "se_register_operand" "d")))
 		      (const_int 64))))
    (clobber (match_scratch:DI 3 "=l"))
    (clobber (match_scratch:DI 4 "=a"))]
@@ -1087,7 +1117,13 @@
    (clobber (match_scratch:SI 3 "=h"))
    (clobber (match_scratch:SI 4 "=a"))]
   "TARGET_MAD"
-  "mad\\t%1,%2"
+  "*
+{
+  if (TARGET_MAD)
+    return \"mad\\t%1,%2\";
+  else
+    return \"madd\\t%1,%2\";
+}"
   [(set_attr "type"	"imul")
    (set_attr "mode"	"SI")
    (set_attr "length"   "1")])
@@ -1157,7 +1193,7 @@
 	(plus:DF (mult:DF (match_operand:DF 1 "register_operand" "f")
 			  (match_operand:DF 2 "register_operand" "f"))
 		 (match_operand:DF 3 "register_operand" "f")))]
-  "mips_isa >= 4 && TARGET_HARD_FLOAT"
+  "mips_isa >= 4 && TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
   "madd.d\\t%0,%3,%1,%2"
   [(set_attr "type"	"fmadd")
    (set_attr "mode"	"DF")
@@ -1179,7 +1215,7 @@
 	(minus:DF (mult:DF (match_operand:DF 1 "register_operand" "f")
 			   (match_operand:DF 2 "register_operand" "f"))
 		  (match_operand:DF 3 "register_operand" "f")))]
-  "mips_isa >= 4 && TARGET_HARD_FLOAT"
+  "mips_isa >= 4 && TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
   "msub.d\\t%0,%3,%1,%2"
   [(set_attr "type"	"fmadd")
    (set_attr "mode"	"DF")
@@ -1202,7 +1238,7 @@
 	(neg:DF (plus:DF (mult:DF (match_operand:DF 1 "register_operand" "f")
 				  (match_operand:DF 2 "register_operand" "f"))
 			 (match_operand:DF 3 "register_operand" "f"))))]
-  "mips_isa >= 4 && TARGET_HARD_FLOAT"
+  "mips_isa >= 4 && TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
   "nmadd.d\\t%0,%3,%1,%2"
   [(set_attr "type"	"fmadd")
    (set_attr "mode"	"DF")
@@ -1224,7 +1260,7 @@
 	(minus:DF (match_operand:DF 1 "register_operand" "f")
 		  (mult:DF (match_operand:DF 2 "register_operand" "f")
 			   (match_operand:DF 3 "register_operand" "f"))))]
-  "mips_isa >= 4 && TARGET_HARD_FLOAT"
+  "mips_isa >= 4 && TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
   "nmsub.d\\t%0,%1,%2,%3"
   [(set_attr "type"	"fmadd")
    (set_attr "mode"	"DF")
