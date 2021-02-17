@@ -339,7 +339,7 @@ __extension__								\
      _obstack_newchunk (__o, sizeof (void *));				\
    if (!__o->alloc_failed)						\
      *((void **)__o->next_free) = ((void *)datum);			\
-     __o->next_free += sizeof (void *);                                   \
+      __o->next_free = (void**)__o->next_free++;			\
    (void) 0; })
 
 #define obstack_int_grow(OBSTACK,datum)					\
