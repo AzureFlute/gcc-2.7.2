@@ -13,7 +13,6 @@ sudo apt-get install build-essential flex libelf-dev libc6-dev libc6-dev-i386 bi
 
 ```
 ./configure --target=mips --prefix=$OUTPUT_DIR --host=i386-pc-linux --build=i386-pc-linux
-sed -i 's/CC = \(g\?cc\)/CC = \1 -m32/g' Makefile
 sed -i -E 's/LANGUAGES = c .+$/LANGUAGES = c/g' Makefile
 ```
 
